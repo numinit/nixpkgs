@@ -25,7 +25,6 @@ let
     emulatorVersion = "27.2.0";
     platformVersions = [ "24" ];
     includeSources = false;
-    includeDocs = false;
     includeSystemImages = false;
     systemImageTypes = [ "default" ];
     abiVersions = [ "armeabi-v7a" ];
@@ -56,7 +55,6 @@ The following parameters are supported:
 * `includeEmulator` specifies whether to deploy the emulator package (`false`
   by default). When enabled, the version of the emulator to deploy can be
   specified by setting the `emulatorVersion` parameter.
-* `includeDocs` specifies whether the documentation catalog should be included.
 * `lldbVersions` specifies what LLDB versions should be deployed.
 * `cmakeVersions` specifies which CMake versions should be deployed.
 * `includeNDK` specifies that the Android NDK bundle should be included.
@@ -87,6 +85,38 @@ For each requested system image we can specify the following options:
 
 Most of the function arguments have reasonable default settings.
 
+You can specify license names:
+
+* `extraLicenses` is a list of of license names.
+  You can get these names from repo.json or `querypackages.sh licenses`. The SDK
+  license (`android-sdk-license`) is accepted for you if you set accept_license
+  to true. If you are doing something like working with preview SDKs, you will
+  want to add `android-sdk-preview-license` or whichever license applies here.
+
+Additionally, you can override the repositories that composeAndroidPackages will
+pull from:
+
+* `repoJson` specifies a path to a generated repo.json file. You can generate this
+  by running `generate.sh`, which in turn will call into `mkrepo.rb`.
+* `repoXmls` is an attribute set containing paths to repo XML files. If specified,
+  it takes priority over `repoJson`, and will trigger a local build writing out a
+  repo.json to the Nix store based on the given repository XMLs.
+
+```nix
+repoXmls = {
+  packages = [ ./xml/repository2-1.xml ];
+  images = [
+    ./xml/android-sys-img2-1.xml
+    ./xml/android-tv-sys-img2-1.xml
+    ./xml/android-wear-sys-img2-1.xml
+    ./xml/android-wear-cn-sys-img2-1.xml
+    ./xml/google_apis-sys-img2-1.xml
+    ./xml/google_apis_playstore-sys-img2-1.xml
+  ];
+  addons = [ ./xml/addon2-1.xml ];
+};
+```
+
 When building the above expression with:
 
 ```bash
@@ -109,8 +139,8 @@ in
 androidComposition.platform-tools
 ```
 
-Using predefine Android package compositions
---------------------------------------------
+Using predefined Android package compositions
+---------------------------------------------
 In addition to composing an Android package set manually, it is also possible
 to use a predefined composition that contains all basic packages for a specific
 Android version, such as version 9.0 (API-level 28).
@@ -216,25 +246,22 @@ In addition to prebuilt APKs, you can also bind the APK parameter to a
 
 Querying the available versions of each plugin
 ----------------------------------------------
-When using any of the previously shown functions, it may be a bit inconvenient
-to find out what options are supported, since the Android SDK provides many
-plugins.
+repo.json provides all the options in one file now.
 
-A shell script in the `pkgs/development/mobile/androidenv/` sub directory can be used to retrieve all
+A shell script in the `pkgs/development/mobile/androidenv/` subdirectory can be used to retrieve all
 possible options:
 
 ```bash
-sh ./querypackages.sh packages build-tools
+sh ./querypackages.sh packages
 ```
 
-The above command-line instruction queries all build-tools versions in the
-generated `packages.nix` expression.
+The above command-line instruction queries all package versions in repo.json.
 
 Updating the generated expressions
 ----------------------------------
-Most of the Nix expressions are generated from XML files that the Android
-package manager uses. To update the expressions run the `generate.sh` script
-that is stored in the `pkgs/development/mobile/androidenv/` sub directory:
+repo.json is generated from XML files that the Android Studio package manager uses.
+To update the expressions run the `generate.sh` script that is stored in the
+`pkgs/development/mobile/androidenv/` subdirectory:
 
 ```bash
 ./generate.sh
