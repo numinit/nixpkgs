@@ -61,9 +61,10 @@ let
           log "Block size: $blocksize"
           log "Check every: $check_every files"
 
+          # Create a file filled with 0xff.
           cd "$workdir"
           prefix="zhammer_''${BASHPID}_"
-          dd if=/dev/urandom of="''${prefix}0" bs="$blocksize" count=1 status=none
+          dd if=/dev/zero bs="$blocksize" count=1 status=none | LC_ALL=C tr "\000" "\377" > "''${prefix}0"
 
           cleanup() {
             rm -f "$prefix"* || true
@@ -97,8 +98,6 @@ let
                 exit 1
               fi
             done
-
-            rm -f "$prefix"* || true
           done
         '';
       in {
@@ -141,4 +140,5 @@ let
 
 in {
   stable = makeZfsTest "stable" { };
+  #zfs_2_1_with_patch = makeZfsTest "zfs_2_1_with_patch" { zfsPackage = pkgs.zfs_2_1; };
 }
