@@ -21,6 +21,7 @@ let
       name = "zfs-" + name;
       meta = with pkgs.lib.maintainers; {
         maintainers = [ numinit ];
+        timeout = 24 * 60 * 60;
       };
 
       nodes.${name} = { config, pkgs, lib, ... }: let
