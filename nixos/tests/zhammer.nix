@@ -6,25 +6,23 @@
 with import ../lib/testing-python.nix { inherit system pkgs; };
 
 let
-
-  makeZfsTest = name:
-    { kernelPackage ? if enableUnstable
-                      then pkgs.zfsUnstable.latestCompatibleLinuxPackages
-                      else pkgs.linuxPackages
+  makeZfsTest = testName:
+    { kernelPackage ? zfsPackage.latestCompatibleLinuxPackages
     , extraKernelParams ? []
     , enableUnstable ? false
     , ignoreFailures ? false
     , zfsPackage ? if enableUnstable then pkgs.zfsUnstable else pkgs.zfs
     , extraTest ? ""
     }:
-    makeTest {
-      name = "zfs-" + name;
+    makeTest rec {
+      name = "zfs-" + testName;
+      globalTimeout = 24 * 60 * 60;
       meta = with pkgs.lib.maintainers; {
         maintainers = [ numinit ];
-        timeout = 24 * 60 * 60;
+        timeout = globalTimeout;
       };
 
-      nodes.${name} = { config, pkgs, lib, ... }: let
+      nodes.${testName} = { config, pkgs, lib, ... }: let
         zhammer = pkgs.writeShellScriptBin "zhammer" (builtins.readFile ./zhammer.sh);
       in {
         virtualisation = {
@@ -53,7 +51,7 @@ let
       };
 
       testScript = ''
-        machine = ${name}
+        machine = ${testName}
         machine.wait_for_unit("multi-user.target")
         machine.succeed(
           "zpool status",
