@@ -24,84 +24,7 @@ let
       };
 
       nodes.${name} = { config, pkgs, lib, ... }: let
-        zhammer = pkgs.writeShellScriptBin "zhammer" ''
-          set -euo pipefail
-
-          workdir="."
-          count=100000
-          blocksize="16k"
-          check_every=10000
-
-          if [ $# -ge 1 ]; then
-            workdir="$1"
-          fi
-
-          if [ $# -ge 2 ]; then
-            count="$2"
-          fi
-
-          if [ $# -ge 3 ]; then
-            blocksize="$3"
-          fi
-
-          if [ $# -ge 4 ]; then
-            check_every="$4"
-          fi
-
-          log() {
-            echo "[zhammer::''${BASHPID}] $1" >&2
-          }
-
-          if [ ! -d "$workdir" ] || [ ! "$count" -gt 0 ] || [ -z "$blocksize" ] || [ ! "$check_every" -gt 0 ]; then
-            log "Usage: $0 <workdir> <count> <blocksize> <check_every>"
-            exit 1
-          fi
-
-          log "Work dir: $workdir"
-          log "Count: $count files"
-          log "Block size: $blocksize"
-          log "Check every: $check_every files"
-
-          # Create a file filled with 0xff.
-          cd "$workdir"
-          prefix="zhammer_''${BASHPID}_"
-          dd if=/dev/zero bs="$blocksize" count=1 status=none | LC_ALL=C tr "\000" "\377" > "''${prefix}0"
-
-          cleanup() {
-            rm -f "$prefix"* || true
-          }
-
-          trap cleanup EXIT
-
-          total=0
-          for (( n=0; n<=$count; n+=$check_every )); do
-            log "writing $check_every files at iteration $n"
-            h=0
-            for (( i=1; i<=$check_every; i+=2 )); do
-              j=$((i+1))
-              cp --reflink=never --sparse=always "''${prefix}$h" "''${prefix}$i" || true
-              cp --reflink=never --sparse=always "''${prefix}$i" "''${prefix}$j" || true
-              h=$((h+1))
-            done
-
-            log "checking $check_every files at iteration $n"
-            for (( i=1; i<=$check_every; i++ )); do
-              old="''${prefix}0"
-              copy="''${prefix}$i"
-              if [ -f "$old" ] && [ -f "$copy" ] && ! cmp -s "$old" "$copy"; then
-                log "$old differed from $copy!"
-                hexdump -C "$old" > "$old.hex"
-                hexdump -C "$copy" > "$copy.hex"
-                log "Hexdump diff follows"
-                diff -u "$old.hex" "$copy.hex" >&2 || true
-                log "ZFS version info" >&2
-                zfs version >&2 || true
-                exit 1
-              fi
-            done
-            rm -f "$prefix"[1-9]* || true
-          done
-        '';
+        zhammer = pkgs.writeShellScriptBin "zhammer" (builtins.readFile ./zhammer.sh);
       in {
         virtualisation = {
           cores = 8;
@@ -139,7 +62,7 @@ let
         )
 
         machine.succeed(
-          "parallel --lb --halt-on-error now,fail=1 zhammer /test 1000000 16k 10000 ::: $(seq $(nproc))${pkgs.lib.optionalString ignoreFailures " || true"}"
+          "parallel --lb --halt-on-error now,fail=1 zhammer /test 10000000 16k 10000 ::: $(seq $(nproc))${pkgs.lib.optionalString ignoreFailures " || true"}"
         )
       '' + extraTest;
     };
