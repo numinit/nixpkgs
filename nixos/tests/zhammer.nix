@@ -70,7 +70,7 @@ let
 
 
 in {
-  zfs_2_2_1 = makeZfsTest "zfs_2_2_1" { ignoreFailures = true; };
+  zfs_2_2_1_stock = makeZfsTest "zfs_2_2_1_stock" { ignoreFailures = true; };
   zfs_2_2_1_zfs_dmu_offset_next_sync = makeZfsTest "zfs_2_2_1_zfs_dmu_offset_next_sync" { ignoreFailures = true; extraKernelParams = [ "zfs.zfs_dmu_offset_next_sync=0" ]; };
   /*
   # For some reason, this fails
