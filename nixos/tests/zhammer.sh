@@ -54,12 +54,21 @@ print_zfs_version_info() {
     sha256="$("$cmd" "$module" | sha256sum | awk '{print $1}')"
   fi
 
+  log "==="
   log "Uname: $uname"
+  log "Cmdline: $(</proc/cmdline)"
+  for param in zfs_bclone_enabled zfs_bclone_wait_dirty zfs_dmu_offset_next_sync; do
+    local filename="/sys/module/zfs/parameters/$param"
+    if [ -f "$filename" ]; then
+        log "  - $param: $(<"$filename")"
+    fi
+  done
   log "ZFS userspace: $version"
   log "ZFS kernel: $kmod"
   log "Module: $module"
   log "Srcversion: $srcversion"
   log "SHA256: $sha256"
+  log "==="
 }
 
 if [ ! -d "$workdir" ] || [ ! "$count" -gt 0 ] || [ -z "$blocksize" ] || [ ! "$check_every" -gt 0 ]; then
@@ -79,7 +88,7 @@ log "Check every: $check_every files"
 # Create a file filled with 0xff.
 cd "$workdir"
 prefix="zhammer_${BASHPID}_"
-dd if=/dev/zero bs="$blocksize" count=1 status=none | LC_ALL=C tr "\000" "\377" > "${prefix}0"
+dd if=/dev/urandom bs="$blocksize" count=1 status=none > "${prefix}0"
 
 cleanup() {
   rm -f "$prefix"* || true
