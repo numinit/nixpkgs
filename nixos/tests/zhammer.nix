@@ -56,12 +56,12 @@ let
         machine.succeed(
           "zpool status",
           "truncate -s 4G /dev/shm/zfs",
-          "zpool create -f -o ashift=12 -O canmount=off -O mountpoint=none -O xattr=sa -O dnodesize=auto -O acltype=posix -O atime=off -O relatime=on tank /dev/shm/zfs",
+          "zpool create -f -o ashift=12 -O canmount=off -O mountpoint=none tank /dev/shm/zfs",
           "zfs create -o canmount=on -o mountpoint=/test tank/test"
         )
 
         machine.succeed(
-          "parallel --lb --halt-on-error now,fail=1 zhammer /test 10000000 256k 1000 ::: $(seq $(nproc))${pkgs.lib.optionalString ignoreFailures " || true"}"
+          "parallel --lb --halt-on-error now,fail=1 zhammer /test 10000000 16k 5000 ::: $(seq $(nproc))${pkgs.lib.optionalString ignoreFailures " || true"}"
         )
       '' + extraTest;
     };
