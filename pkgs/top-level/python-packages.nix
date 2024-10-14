@@ -15616,6 +15616,10 @@ self: super: with self; {
 
   stop-words = callPackage ../development/python-modules/stop-words { };
 
+  stp = toPythonModule (pkgs.stp.override {
+    python3 = self.python;
+  });
+
   stransi = callPackage ../development/python-modules/stransi { };
 
   strategies = callPackage ../development/python-modules/strategies { };
