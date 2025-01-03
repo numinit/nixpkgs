@@ -2,9 +2,11 @@
 , buildGoModule
 , fetchFromGitHub
 , buildNpmPackage
-, runCommand
+, nix-update-script
+, npm-lockfile-fix
+, fetchNpmDeps
+, diffutils
 , jq
-, go
 , nixosTests
 }:
 
@@ -20,7 +22,22 @@ buildGoModule rec {
     owner = "mattermost";
     repo = "mattermost";
     rev = "v${version}";
-    hash = "sha256-5nUzUnVWVBnQErbMJeSe2ZxCcdcHSmT34JXjFlRMW/s=";
+    hash = "sha256-qn3bs3RtKTh/FMMc53dstVUyIrRwB/WD3skfcqqCTxM=";
+    postFetch = ''
+      cd $out/webapp
+
+      # Remove "+..." suffixes on versions.
+      ${lib.getExe jq} '
+        def desuffix(version): version | gsub("^(?<prefix>[^\\+]+)\\+.*$"; "\(.prefix)");
+        .packages |= map_values(if has("version") then .version = desuffix(.version) else . end)
+      ' < package-lock.json > package-lock.fixed.json
+      ${lib.getExe npm-lockfile-fix} package-lock.fixed.json
+
+      # Produce a diff that's useful for upstreaming changes.
+      ${diffutils}/bin/diff -u package-lock.json package-lock.fixed.json > package-lock.json.diff || true
+      rm -f package-lock.json
+      mv package-lock.fixed.json package-lock.json
+    '';
   };
 
   # Needed because buildGoModule does not support go workspaces yet.
@@ -34,33 +51,31 @@ buildGoModule rec {
     '';
   });
 
+  npmDeps = fetchNpmDeps {
+    inherit src;
+    sourceRoot = "${src.name}/webapp";
+    hash = "sha256-ysz38ywGxJ5DXrrcDmcmezKbc5Y7aug9jOWUzHRAs/0=";
+    makeCacheWritable = true;
+    forceGitDeps = true;
+  };
+
   webapp = buildNpmPackage rec {
     pname = "mattermost-webapp";
     inherit version src;
 
     sourceRoot = "${src.name}/webapp";
 
-    # Fix build dependency conflicts
-    patchedPackageJSON = runCommand "package.json" { } ''
-      ${jq}/bin/jq '.devDependencies.ajv = "8.17.1" |
-        .overrides."@types/scheduler" = "< 0.23.0"
-      ' ${src}/webapp/package.json > $out
-    '';
-
     postPatch = ''
-      cp ${patchedPackageJSON} package.json
-      cp ${./package-lock.json} package-lock.json
-
       # Remove deprecated image-webpack-loader causing build failures
       # See: https://github.com/tcoopman/image-webpack-loader#deprecated
-      sed -i 's/options: {},/options: { disable: true },/' channels/webpack.config.js
+      substituteInPlace channels/webpack.config.js --replace-fail 'options: {}' 'options: { disable: true }'
     '';
 
+    npmDepsHash = npmDeps.hash;
     makeCacheWritable = true;
     forceGitDeps = true;
 
     npmRebuildFlags = [ "--ignore-scripts" ];
-    npmDepsHash = "sha256-E31gKv9ITjlGN/J5Ly38Qq0OsWsdWzwFJNVVzLRj8BA=";
 
     buildPhase = ''
       runHook preBuild
@@ -112,14 +127,16 @@ buildGoModule rec {
     cp -r ${src}/server/fonts/* $out/fonts/
     cp -r ${src}/server/templates/* $out/templates/
     OUTPUT_CONFIG=$out/config/config.json \
-      ${go}/bin/go run -tags production ./scripts/config_generator
+      go run -tags production ./scripts/config_generator
 
     # For some reason a bunch of these files are executable
     find $out/{client,i18n,fonts,templates,config} -type f -exec chmod -x {} \;
   '';
 
   passthru = {
-    updateScript = ./update.sh;
+    updateScript = nix-update-script {
+      extraArgs = [ "--version-regex" "^v(9\.11\.[0-9]+)$" ];
+    };
     tests.mattermost = nixosTests.mattermost;
   };
 
