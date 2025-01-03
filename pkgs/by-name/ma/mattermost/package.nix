@@ -1,8 +1,10 @@
 { lib
 , buildGoModule
 , fetchFromGitHub
-, nix-update-script
-, fetchurl
+, buildNpmPackage
+, runCommand
+, jq
+, go
 , nixosTests
 }:
 
@@ -32,14 +34,54 @@ buildGoModule rec {
     '';
   });
 
-  webapp = fetchurl {
-    url = "https://releases.mattermost.com/${version}/mattermost-${version}-linux-amd64.tar.gz";
-    hash = "sha256-yG5GDeuCHv95e+b2xi/UYiCGkV+I3aqj13Qh/YbyOWQ=";
-  };
+  webapp = buildNpmPackage rec {
+    pname = "mattermost-webapp";
+    inherit version src;
 
-  # Makes nix-update-script pick up the fetchurl for the webapp.
-  # https://github.com/Mic92/nix-update/blob/1.3.1/nix_update/eval.py#L179
-  offlineCache = webapp;
+    sourceRoot = "${src.name}/webapp";
+
+    # Fix build dependency conflicts
+    patchedPackageJSON = runCommand "package.json" { } ''
+      ${jq}/bin/jq '.devDependencies.ajv = "8.17.1" |
+        .overrides."@types/scheduler" = "< 0.23.0"
+      ' ${src}/webapp/package.json > $out
+    '';
+
+    postPatch = ''
+      cp ${patchedPackageJSON} package.json
+      cp ${./package-lock.json} package-lock.json
+
+      # Remove deprecated image-webpack-loader causing build failures
+      # See: https://github.com/tcoopman/image-webpack-loader#deprecated
+      sed -i 's/options: {},/options: { disable: true },/' channels/webpack.config.js
+    '';
+
+    makeCacheWritable = true;
+    forceGitDeps = true;
+
+    npmRebuildFlags = [ "--ignore-scripts" ];
+    npmDepsHash = "sha256-E31gKv9ITjlGN/J5Ly38Qq0OsWsdWzwFJNVVzLRj8BA=";
+
+    buildPhase = ''
+      runHook preBuild
+
+      npm run build --workspace=platform/types
+      npm run build --workspace=platform/client
+      npm run build --workspace=platform/components
+      npm run build --workspace=channels
+
+      runHook postBuild
+    '';
+
+    installPhase = ''
+      runHook preInstall
+
+      mkdir -p $out
+      cp -r channels/dist/* $out
+
+      runHook postInstall
+    '';
+  };
 
   vendorHash = "sha256-Gwv6clnq7ihoFC8ox8iEM5xp/us9jWUrcmqA9/XbxBE=";
 
@@ -64,17 +106,20 @@ buildGoModule rec {
   ];
 
   postInstall = ''
-    tar --strip 1 --directory $out -xf $webapp \
-      mattermost/{client,i18n,fonts,templates,config}
+    mkdir -p $out/{client,i18n,fonts,templates,config}
+    cp -r ${webapp}/* $out/client/
+    cp -r ${src}/server/i18n/* $out/i18n/
+    cp -r ${src}/server/fonts/* $out/fonts/
+    cp -r ${src}/server/templates/* $out/templates/
+    OUTPUT_CONFIG=$out/config/config.json \
+      ${go}/bin/go run -tags production ./scripts/config_generator
 
     # For some reason a bunch of these files are executable
     find $out/{client,i18n,fonts,templates,config} -type f -exec chmod -x {} \;
   '';
 
   passthru = {
-    updateScript = nix-update-script {
-      extraArgs = [ "--version-regex" "^v(9\\.11\\.[0-9]+)$" ];
-    };
+    updateScript = ./update.sh;
     tests.mattermost = nixosTests.mattermost;
   };
 
