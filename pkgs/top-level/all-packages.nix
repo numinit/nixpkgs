@@ -17921,7 +17921,7 @@ with pkgs;
     z3_4_11
     z3_4_8
     z3_4_8_5;
-  z3 = z3_4_13;
+  z3 = z3_4_8;
   z3-tptp = callPackage ../applications/science/logic/z3/tptp.nix { };
 
   tlaplus = callPackage ../applications/science/logic/tlaplus {
