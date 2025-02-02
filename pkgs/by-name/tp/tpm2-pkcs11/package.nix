@@ -1,5 +1,5 @@
 {
-  stdenv,
+  clangStdenv,
   lib,
   fetchFromGitHub,
   pkg-config,
@@ -7,6 +7,7 @@
   autoconf-archive,
   makeWrapper,
   patchelf,
+  tpm2-abrmd,
   tpm2-tss,
   tpm2-tools,
   opensc,
@@ -15,39 +16,49 @@
   python3,
   glibc,
   libyaml,
+  cmocka,
   abrmdSupport ? true,
-  tpm2-abrmd ? null,
   fapiSupport ? true,
+  fuzz ? false,
 }:
 
-stdenv.mkDerivation rec {
+clangStdenv.mkDerivation rec {
   pname = "tpm2-pkcs11";
-  version = "1.9.0";
+  version = "1.9.1";
 
   src = fetchFromGitHub {
     owner = "tpm2-software";
     repo = pname;
     rev = version;
-    sha256 = "sha256-SoHtgZRIYNJg4/w1MIocZAM26mkrM+UOQ+RKCh6nwCk=";
+    hash = "sha256-W74ckrpK7ypny1L3Gn7nNbOVh8zbHavIk/TX3b8XbI8=";
   };
-
-  patches = [
-    ./version.patch
-    ./graceful-fapi-fail.patch
-  ];
 
   # The preConfigure phase doesn't seem to be working here
   # ./bootstrap MUST be executed as the first step, before all
   # of the autoreconfHook stuff
   postPatch = ''
-    echo ${version} > VERSION
+    echo "$version" > VERSION
+
+    # Don't run git in the bootstrap
+    substituteInPlace bootstrap --replace-warn "git" "# git"
+
+    # Don't run tests with dbus
+    substituteInPlace Makefile.am --replace-fail "dbus-run-session" "env"
+
+    patchShebangs test
+
     ./bootstrap
   '';
 
-  configureFlags = lib.optionals (!fapiSupport) [
-    # Note: this will be renamed to with-fapi in next release.
-    "--enable-fapi=no"
-  ];
+  configureFlags =
+    [
+      "--enable-unit"
+    ]
+    ++ lib.optionals fuzz [
+      "--enable-fuzzing"
+      "--disable-hardening"
+    ]
+    ++ lib.optional fapiSupport "--with-fapi";
 
   nativeBuildInputs = [
     pkg-config
@@ -55,8 +66,9 @@ stdenv.mkDerivation rec {
     autoconf-archive
     makeWrapper
     patchelf
+    cmocka
   ];
-  buildInputs = [
+  buildInputs = lib.optional abrmdSupport tpm2-abrmd ++ [
     tpm2-tss
     tpm2-tools
     opensc
@@ -74,12 +86,16 @@ stdenv.mkDerivation rec {
     ))
   ];
 
+  enableParallelBuilding = true;
+  hardeningDisable = lib.optional fuzz "all";
+
   outputs = [
     "out"
     "bin"
     "dev"
   ];
 
+  doCheck = true;
   dontStrip = true;
   dontPatchELF = true;
 
