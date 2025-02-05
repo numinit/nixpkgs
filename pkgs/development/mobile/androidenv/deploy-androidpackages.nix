@@ -112,5 +112,9 @@ stdenv.mkDerivation ({
 
   meta = {
     description = lib.concatMapStringsSep "\n" (package: package.displayName) packages;
+    maintainers = with lib.maintainers; [
+      numinit
+      hadilq
+    ];
   } // meta;
 } // extraParams)

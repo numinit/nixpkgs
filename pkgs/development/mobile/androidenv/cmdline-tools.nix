@@ -46,5 +46,7 @@ deployAndroidPackage {
     ${postInstall}
   '';
 
+  passthru.updateScript = ./update.sh;
+
   meta.license = lib.licenses.unfree;
 }

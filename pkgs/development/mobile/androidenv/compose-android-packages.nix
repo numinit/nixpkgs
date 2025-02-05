@@ -1,27 +1,62 @@
-{ callPackage, stdenv, lib, fetchurl, ruby, writeText
+{ callPackage, stdenv, stdenvNoCC, lib, fetchurl, ruby, writeText
 , licenseAccepted ? false
 }:
 
-{ cmdLineToolsVersion ? "13.0"
-, toolsVersion ? "26.1.1"
-, platformToolsVersion ? "35.0.2"
-, buildToolsVersions ? [ "35.0.0" ]
+{ repoJson ? ./repo.json
+, repoXmls ? null
+, repo ? (
+  # Reads the repo JSON. If repoXmls is provided, will build a repo JSON into the Nix store.
+  if repoXmls != null then
+    let
+      # Uses mkrepo.rb to create a repo spec.
+      mkRepoJson = { packages ? [], images ? [], addons ? [] }: let
+        mkRepoRuby = (ruby.withPackages (pkgs: with pkgs; [ slop nokogiri ]));
+        mkRepoRubyArguments = lib.lists.flatten [
+          (map (package: ["--packages" "${package}"]) packages)
+          (map (image: ["--images" "${image}"]) images)
+          (map (addon: ["--addons" "${addon}"]) addons)
+        ];
+      in
+      stdenvNoCC.mkDerivation {
+        name = "androidenv-repo-json";
+        buildInputs = [ mkRepoRuby ];
+        preferLocalBuild = true;
+        unpackPhase = "true";
+        buildPhase = ''
+          ruby ${./mkrepo.rb} ${lib.escapeShellArgs mkRepoRubyArguments} > repo.json
+        '';
+        installPhase = ''
+          mv repo.json $out
+        '';
+      };
+       repoXmlSpec = {
+         packages = repoXmls.packages or [];
+         images = repoXmls.images or [];
+         addons = repoXmls.addons or [];
+       };
+    in
+      lib.importJSON "${mkRepoJson repoXmlSpec}"
+  else
+    lib.importJSON repoJson
+  )
+, cmdLineToolsVersion ? repo.latest.cmdline-tools
+, toolsVersion ? repo.latest.tools
+, platformToolsVersion ? repo.latest.platform-tools
+, buildToolsVersions ? [ repo.latest.build-tools ]
 , includeEmulator ? false
-, emulatorVersion ? "35.3.10"
-, platformVersions ? []
+, emulatorVersion ? repo.latest.emulator
+, platformVersions ? [ repo.latest.platforms ]
 , includeSources ? false
 , includeSystemImages ? false
 , systemImageTypes ? [ "google_apis" "google_apis_playstore" ]
 , abiVersions ? [ "x86" "x86_64" "armeabi-v7a" "arm64-v8a" ]
-, cmakeVersions ? [ ]
+, cmakeVersions ? [ repo.latest.cmake ]
 , includeNDK ? false
-, ndkVersion ? "27.0.12077973"
-, ndkVersions ? [ndkVersion]
+, ndkVersion ? repo.latest.ndk
+, ndkVersions ? [ ndkVersion ]
 , useGoogleAPIs ? false
 , useGoogleTVAddOns ? false
 , includeExtras ? []
-, repoJson ? ./repo.json
-, repoXmls ? null
 , extraLicenses ? []
 }:
 
@@ -30,41 +65,6 @@ let
   os = if stdenv.hostPlatform.isLinux then "linux"
     else if stdenv.hostPlatform.isDarwin then "macosx"
     else throw "No Android SDK tarballs are available for system architecture: ${stdenv.system}";
-
-  # Uses mkrepo.rb to create a repo spec.
-  mkRepoJson = { packages ? [], images ? [], addons ? [] }: let
-    mkRepoRuby = (ruby.withPackages (pkgs: with pkgs; [ slop nokogiri ]));
-    mkRepoRubyArguments = lib.lists.flatten [
-      (builtins.map (package: ["--packages" "${package}"]) packages)
-      (builtins.map (image: ["--images" "${image}"]) images)
-      (builtins.map (addon: ["--addons" "${addon}"]) addons)
-    ];
-  in
-  stdenv.mkDerivation {
-    name = "androidenv-repo-json";
-    buildInputs = [ mkRepoRuby ];
-    preferLocalBuild = true;
-    unpackPhase = "true";
-    buildPhase = ''
-      ruby ${./mkrepo.rb} ${lib.escapeShellArgs mkRepoRubyArguments} > repo.json
-    '';
-    installPhase = ''
-      mv repo.json $out
-    '';
-  };
-
-  # Reads the repo JSON. If repoXmls is provided, will build a repo JSON into the Nix store.
-  repo = if repoXmls != null then
-           let
-             repoXmlSpec = {
-               packages = repoXmls.packages or [];
-               images = repoXmls.images or [];
-               addons = repoXmls.addons or [];
-             };
-           in
-           lib.importJSON "${mkRepoJson repoXmlSpec}"
-         else
-           lib.importJSON repoJson;
 
   # Converts all 'archives' keys in a repo spec to fetchurl calls.
   fetchArchives = attrSet:
