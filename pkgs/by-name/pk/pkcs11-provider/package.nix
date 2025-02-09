@@ -6,6 +6,7 @@
   nss,
   p11-kit,
   opensc,
+  softhsm,
   gnutls,
   expect,
   which,
@@ -48,6 +49,7 @@ stdenv.mkDerivation rec {
   nativeCheckInputs = [
     p11-kit.bin
     opensc
+    softhsm
     nss.tools
     gnutls
     openssl.bin
