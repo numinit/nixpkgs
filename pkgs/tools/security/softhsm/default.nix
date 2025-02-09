@@ -2,6 +2,7 @@
   lib,
   stdenv,
   fetchurl,
+  fetchpatch,
   botan2,
   sqlite,
   libobjc,
@@ -17,6 +18,13 @@ stdenv.mkDerivation rec {
     url = "https://dist.opendnssec.org/source/${pname}-${version}.tar.gz";
     hash = "sha256-YSSUcwVLzRgRUZ75qYmogKe9zDbTF8nCVFf8YU30dfI=";
   };
+
+  patches = [
+    (fetchpatch {
+      url = "https://github.com/softhsm/SoftHSMv2/pull/742.patch";
+      hash = "sha256-DH5aEdmllbSsL7pHPgIUdfRhXOhkfIeEbjpD9FbdIIw=";
+    })
+  ];
 
   configureFlags = [
     "--with-crypto-backend=botan"
@@ -35,6 +43,8 @@ stdenv.mkDerivation rec {
     botan2
     sqlite
   ];
+
+  enableParallelBuilding = true;
 
   postInstall = "rm -rf $out/var";
 
