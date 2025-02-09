@@ -1,8 +1,11 @@
 {
   lib,
   stdenv,
-  fetchurl,
+  fetchFromGitHub,
   fetchpatch,
+  libtool,
+  autoconf,
+  automake,
   botan2,
   sqlite,
   libobjc,
@@ -10,20 +13,40 @@
 }:
 
 stdenv.mkDerivation rec {
-
   pname = "softhsm";
   version = "2.6.1";
 
-  src = fetchurl {
+  /*src = fetchurl {
     url = "https://dist.opendnssec.org/source/${pname}-${version}.tar.gz";
     hash = "sha256-YSSUcwVLzRgRUZ75qYmogKe9zDbTF8nCVFf8YU30dfI=";
+  };*/
+
+  src = fetchFromGitHub {
+    owner = "softhsm";
+    repo = "SoftHSMv2";
+    tag = version;
+    hash = "sha256-sx0ceVY795JbtKbQGAVFllB9UJfTdgd242d6c+s1tBw=";
   };
 
   patches = [
     (fetchpatch {
+      url = "https://github.com/softhsm/SoftHSMv2/pull/550.patch";
+      hash = "sha256-G9nstc5M8U6g1kYGwjzTI35TJ0VhqTAFsrXqSHktzSg=";
+    })
+    (fetchpatch {
+      url = "https://github.com/softhsm/SoftHSMv2/pull/551.patch";
+      hash = "sha256-ikWw4d1gyhDFGjnP7Yym2prmKM4rSdDVbekNKwULhvU=";
+    })
+    (fetchpatch {
       url = "https://github.com/softhsm/SoftHSMv2/pull/742.patch";
       hash = "sha256-DH5aEdmllbSsL7pHPgIUdfRhXOhkfIeEbjpD9FbdIIw=";
     })
+  ];
+
+  nativeBuildInputs = [
+    libtool
+    autoconf
+    automake
   ];
 
   configureFlags = [
@@ -33,6 +56,10 @@ stdenv.mkDerivation rec {
     "--sysconfdir=$out/etc"
     "--localstatedir=$out/var"
   ];
+
+  preConfigure = ''
+    ./autogen.sh
+  '';
 
   propagatedBuildInputs = lib.optionals stdenv.hostPlatform.isDarwin [
     libobjc
