@@ -8,6 +8,8 @@
   capabilitiesSupport ? stdenv.hostPlatform.isLinux,
   libcap_ng,
   libxcrypt,
+  cryptsetupSupport ? stdenv.hostPlatform.isLinux,
+  cryptsetup,
   ncursesSupport ? true,
   ncurses,
   pamSupport ? true,
@@ -26,7 +28,10 @@
 
 stdenv.mkDerivation rec {
   pname =
-    "util-linux" + lib.optionalString (!nlsSupport && !ncursesSupport && !systemdSupport) "-minimal";
+    "util-linux"
+    + lib.optionalString (
+      !cryptsetupSupport && !nlsSupport && !ncursesSupport && !systemdSupport
+    ) "-minimal";
   version = "2.40.4";
 
   src = fetchurl {
@@ -88,6 +93,7 @@ stdenv.mkDerivation rec {
       "--disable-su" # provided by shadow
       (lib.enableFeature writeSupport "write")
       (lib.enableFeature nlsSupport "nls")
+      (lib.withFeature cryptsetupSupport "cryptsetup")
       (lib.withFeature ncursesSupport "ncursesw")
       (lib.withFeature systemdSupport "systemd")
       (lib.withFeatureAs systemdSupport "systemdsystemunitdir" "${placeholder "bin"}/lib/systemd/system/")
@@ -123,6 +129,9 @@ stdenv.mkDerivation rec {
       zlib
       libxcrypt
       sqlite
+    ]
+    ++ lib.optionals cryptsetupSupport [
+      cryptsetup
     ]
     ++ lib.optionals pamSupport [ pam ]
     ++ lib.optionals capabilitiesSupport [ libcap_ng ]
