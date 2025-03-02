@@ -689,6 +689,7 @@ in {
   morty = handleTest ./morty.nix {};
   mosquitto = handleTest ./mosquitto.nix {};
   moosefs = handleTest ./moosefs.nix {};
+  mount = handleTest ./mount.nix {};
   movim = discoverTests (import ./web-apps/movim { inherit handleTestOn; });
   mpd = handleTest ./mpd.nix {};
   mpv = handleTest ./mpv.nix {};
