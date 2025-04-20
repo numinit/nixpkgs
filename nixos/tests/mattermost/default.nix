@@ -362,8 +362,6 @@ import ../make-test-python.nix (
       ''
         import sys
         import shlex
-        import threading
-        import queue
 
         def wait_mattermost_up(node, site_name="${siteName}"):
           print(f"wait_mattermost_up({node.name!r}, site_name={site_name!r})", file=sys.stderr)
@@ -405,8 +403,7 @@ import ../make-test-python.nix (
           print(f"switch_to_specialisation({node.name!r}, {toplevel!r}, {specialisation!r})", file=sys.stderr)
           node.succeed(f"{toplevel}/specialisation/{specialisation}/bin/switch-to-configuration switch || true")
 
-        def run_mattermost_tests(shutdown_queue: queue.Queue,
-                                 mutableToplevel: str, mutable,
+        def run_mattermost_tests(mutableToplevel: str, mutable,
                                  mostlyMutableToplevel: str, mostlyMutablePlugins: str, mostlyMutable,
                                  immutableToplevel: str, immutable,
                                  environmentFileToplevel: str, environmentFile):
@@ -439,7 +436,7 @@ import ../make-test-python.nix (
           # AboutLink and HelpLink should be changed, still, and the post should still exist
           expect_config(mutable, latest, '.AboutLink == "https://mattermost.com" and .HelpLink == "https://nixos.org/nixos/manual"')
           ensure_post(mutable, fail_if_not_found=True)
-          shutdown_queue.put(mutable)
+          mutable.shutdown()
 
           ## Mostly mutable node tests ##
           mostlyMutable.start()
@@ -503,7 +500,7 @@ import ../make-test-python.nix (
           expect_config(mostlyMutable, latest, '.AboutLink == "https://nixos.org" and .HelpLink == "https://nixos.org/nixos/manual/bar"')
           ensure_post(mostlyMutable, fail_if_not_found=True)
 
-          shutdown_queue.put(mostlyMutable)
+          mostlyMutable.shutdown()
 
           ## Immutable node tests ##
           immutable.start()
@@ -538,7 +535,7 @@ import ../make-test-python.nix (
           expect_config(immutable, latest, '.AboutLink == "https://nixos.org" and .HelpLink == "https://search.nixos.org"')
           ensure_post(immutable, fail_if_not_found=True)
 
-          shutdown_queue.put(immutable)
+          immutable.shutdown()
 
           ## Environment File node tests ##
           environmentFile.start()
@@ -557,26 +554,11 @@ import ../make-test-python.nix (
           expect_config(environmentFile, latest, '.AboutLink == "https://nixos.org"')
           ensure_post(environmentFile, fail_if_not_found=True)
 
-          shutdown_queue.put(environmentFile)
-
-        # Run shutdowns asynchronously so we can pipeline them.
-        shutdown_queue: queue.Queue = queue.Queue()
-        def shutdown_worker():
-          while True:
-            node = shutdown_queue.get()
-            print(f"Shutting down node {node.name!r} asynchronously", file=sys.stderr)
-            try:
-              node.shutdown()
-            except Exception as ex:
-              print(ex, file=sys.stderr)
-            finally:
-              shutdown_queue.task_done()
-        threading.Thread(target=shutdown_worker, daemon=True).start()
+          environmentFile.shutdown()
 
         ${pkgs.lib.optionalString pkgs.stdenv.isx86_64 ''
           # Only run the MySQL tests on x86_64 so we don't have to debug MySQL ARM issues.
           run_mattermost_tests(
-            shutdown_queue,
             "${nodes.mysqlMutable.system.build.toplevel}",
             mysqlMutable,
             "${nodes.mysqlMostlyMutable.system.build.toplevel}",
@@ -590,7 +572,6 @@ import ../make-test-python.nix (
         ''}
 
         run_mattermost_tests(
-          shutdown_queue,
           "${nodes.postgresMutable.system.build.toplevel}",
           postgresMutable,
           "${nodes.postgresMostlyMutable.system.build.toplevel}",
@@ -601,9 +582,6 @@ import ../make-test-python.nix (
           "${nodes.postgresEnvironmentFile.system.build.toplevel}",
           postgresEnvironmentFile
         )
-
-        # Drain the queue
-        shutdown_queue.join()
       '';
   }
 )
