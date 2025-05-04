@@ -15,10 +15,10 @@
   python3,
   # Not really used for anything real, just at build time.
   git,
-  replaceVars,
   which,
   z3,
   cctools,
+  procps,
 }:
 
 stdenv.mkDerivation (rec {
@@ -75,9 +75,7 @@ stdenv.mkDerivation (rec {
       ./disable-networking-tests.patch
     ]
     ++ lib.optionals stdenv.hostPlatform.isDarwin [
-      (replaceVars ./fix-darwin-build.patch {
-        apple-sdk = apple-sdk_13;
-      })
+      ./fix-darwin-build.patch
     ];
 
   postUnpack = ''
@@ -88,24 +86,39 @@ stdenv.mkDerivation (rec {
 
   dontConfigure = true;
 
-  postPatch = ''
-    substituteInPlace packages/process/_test.pony \
-        --replace-fail '"/bin/' '"${coreutils}/bin/' \
-        --replace-fail '=/bin' "${coreutils}/bin"
-    substituteInPlace src/libponyc/pkg/package.c \
-        --replace-fail "/usr/local/lib" "" \
-        --replace-fail "/opt/local/lib" ""
+  postPatch =
+    ''
+      substituteInPlace packages/process/_test.pony \
+          --replace-fail '"/bin/' '"${coreutils}/bin/' \
+          --replace-fail '=/bin' "${coreutils}/bin"
+      substituteInPlace src/libponyc/pkg/package.c \
+          --replace-fail "/usr/local/lib" "" \
+          --replace-fail "/opt/local/lib" ""
 
-    # Replace downloads with local copies.
-    substituteInPlace lib/CMakeLists.txt \
-        --replace-fail "https://github.com/google/benchmark/archive/v$benchmarkRev.tar.gz" "$NIX_BUILD_TOP/deps/benchmark-$benchmarkRev.tar" \
-        --replace-fail "https://github.com/google/googletest/archive/refs/tags/v$googletestRev.tar.gz" "$NIX_BUILD_TOP/deps/googletest-$googletestRev.tar"
-  '';
+      # Replace downloads with local copies.
+      substituteInPlace lib/CMakeLists.txt \
+          --replace-fail "https://github.com/google/benchmark/archive/v$benchmarkRev.tar.gz" "$NIX_BUILD_TOP/deps/benchmark-$benchmarkRev.tar" \
+          --replace-fail "https://github.com/google/googletest/archive/refs/tags/v$googletestRev.tar.gz" "$NIX_BUILD_TOP/deps/googletest-$googletestRev.tar"
+    ''
+    + lib.optionalString stdenv.hostPlatform.isDarwin ''
+      # We can't just use replaceVars here because we need to reference $SDKROOT.
+      substituteInPlace src/libponyc/codegen/genexe.c \
+        --replace-fail '@libSystem@' "$SDKROOT/usr"
+    '';
 
-  preBuild = ''
-    make libs build_flags=-j$NIX_BUILD_CORES
-    make configure build_flags=-j$NIX_BUILD_CORES
-  '';
+  preBuild =
+    ''
+      extraFlags=(build_flags=-j$NIX_BUILD_CORES)
+    ''
+    + lib.optionalString stdenv.hostPlatform.isAarch64 ''
+      # See this relnote about building on Raspbian:
+      # https://github.com/ponylang/ponyc/blob/0.46.0/.release-notes/0.45.2.md
+      extraFlags+=(pic_flag=-fPIC)
+    ''
+    + ''
+      make libs "''${extraFlags[@]}"
+      make configure "''${extraFlags[@]}"
+    '';
 
   makeFlags = [
     "PONYC_VERSION=${version}"
@@ -117,8 +130,9 @@ stdenv.mkDerivation (rec {
     "-Wno-error=implicit-fallthrough"
   ];
 
-  # make: *** [Makefile:222: test-full-programs-release] Killed: 9
-  doCheck = !stdenv.hostPlatform.isDarwin;
+  doCheck = true;
+
+  nativeCheckInputs = [ procps ];
 
   installPhase =
     ''
