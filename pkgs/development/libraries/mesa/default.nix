@@ -80,8 +80,10 @@
       "asahi" # Apple AGX, built on non-aarch64 for cross tools
       "intel" # new Intel (aka ANV)
       "microsoft-experimental" # WSL virtualized GPU (aka DZN/Dozen)
-      "nouveau" # Nouveau (aka NVK)
       "swrast" # software renderer (aka Lavapipe)
+    ]
+    ++ lib.optionals (!stdenv.hostPlatform.isAarch32) [
+      "nouveau" # Nouveau (aka NVK), some functions fail to *assemble* on 32 bit ARM
     ]
     ++
       lib.optionals
