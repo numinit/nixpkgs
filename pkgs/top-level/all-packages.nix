@@ -5221,6 +5221,8 @@ with pkgs;
     mkLLVMPackages
     ;
 
+  filcPackages = recurseIntoAttrs (callPackages ../development/compilers/filc { });
+
   mercury = callPackage ../development/compilers/mercury {
     jdk_headless = openjdk8_headless; # TODO: remove override https://github.com/NixOS/nixpkgs/pull/89731
   };

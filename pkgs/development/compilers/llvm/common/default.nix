@@ -32,10 +32,12 @@
   ...
 }@args:
 
-assert lib.assertMsg (lib.xor (gitRelease != null) (officialRelease != null)) (
-  "must specify `gitRelease` or `officialRelease`"
-  + (lib.optionalString (gitRelease != null) " — not both")
-);
+assert lib.assertMsg
+  (lib.count (x: x == true) [ (gitRelease != null) (officialRelease != null) (monorepoSrc != null) ] == 1)
+  (
+    "must specify one of `gitRelease`, `officialRelease`, or `monorepoSrc`"
+    + (lib.optionalString (gitRelease != null) " — not multiple")
+  );
 
 let
   monorepoSrc' = monorepoSrc;
