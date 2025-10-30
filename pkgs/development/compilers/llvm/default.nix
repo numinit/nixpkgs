@@ -37,11 +37,11 @@ let
 
   mkPackage =
     {
-      name ? null,
       officialRelease ? null,
       gitRelease ? null,
       monorepoSrc ? null,
       version ? null,
+      ...
     }@args:
     let
       inherit
@@ -70,7 +70,7 @@ let
               bootBintoolsNoLibc
               ;
 
-            otherSplices = generateSplicesForMkScope "llvmPackages_${attrName}";
+            otherSplices = generateSplicesForMkScope (args.attrName or "llvmPackages_${attrName}");
           }
           // packageSetArgs # Allow overrides.
         )
