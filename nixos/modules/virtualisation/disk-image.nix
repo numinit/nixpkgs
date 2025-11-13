@@ -52,7 +52,8 @@ in
     system.nixos.tags = [ cfg.format ] ++ lib.optionals cfg.efiSupport [ "efi" ];
     image.extension = if cfg.format == "raw" then "img" else cfg.format;
     system.build.image = import ../../lib/make-disk-image.nix {
-      inherit lib config pkgs;
+      inherit lib config;
+      pkgs = pkgs.pkgsBuildBuild;
       inherit (config.virtualisation) diskSize;
       inherit (cfg) baseName format;
       partitionTableType = if cfg.efiSupport then "efi" else "legacy";
