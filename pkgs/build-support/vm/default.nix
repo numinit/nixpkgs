@@ -39,7 +39,7 @@ in
 rec {
   qemu-common = import ../../../nixos/lib/qemu-common.nix { inherit lib pkgs; };
 
-  qemu = buildPackages.qemu_kvm;
+  qemu = buildPackages.qemu_full;
 
   modulesClosure = pkgs.makeModulesClosure {
     kernel = lib.getOutput "modules" kernel;
