@@ -2,6 +2,7 @@
   lib,
   stdenv,
   fetchFromGitHub,
+  ceph,
   cmake,
   ninja,
   bzip2,
@@ -12,28 +13,27 @@
   windows,
   enableJemalloc ? false,
   jemalloc,
-  enableLiburing ? stdenv.hostPlatform.isLinux,
   enableLite ? false,
   enableShared ? !stdenv.hostPlatform.isStatic,
   sse42Support ? stdenv.hostPlatform.sse4_2Support,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "rocksdb";
-  version = "7.9.2";
+  version = "7.9.2-unstable-20230524";
 
   src = fetchFromGitHub {
     owner = "ceph"; # note this is a fork, not the upstream `facebook`
-    repo = finalAttrs.pname;
+    repo = "rocksdb";
     # Version pinned by Ceph `src/rocksdb` submodule, last update from:
     #     https://github.com/ceph/ceph/tree/v19.2.3/src
     rev = "9fa4990159853479a222244574ca41202e4c95c1";
-    sha256 = "sha256-JJXtN8mk8fRsGzyimw4e7tN2/c1RJ4Ei6YioVIMhvl0=";
+    hash = "sha256-JJXtN8mk8fRsGzyimw4e7tN2/c1RJ4Ei6YioVIMhvl0=";
     fetchSubmodules = true;
   };
 
-  patches = lib.optional (
-    lib.versionAtLeast finalAttrs.version "6.29.3" && enableLiburing
-  ) ./patches/fix-findliburing.patch;
+  patches = [
+    ./patches/fix-findliburing.patch
+  ];
 
   postPatch = ''
     # Fix gcc-13 build failures due to missing <cstdint> and
@@ -121,20 +121,16 @@ stdenv.mkDerivation (finalAttrs: {
   postFixup = ''
     if [ -f "$out"/lib/pkgconfig/rocksdb.pc ]; then
       substituteInPlace "$out"/lib/pkgconfig/rocksdb.pc \
-        --replace '="''${prefix}//' '="/'
+        --replace-fail '="''${prefix}//' '="/'
     fi
   '';
 
-  meta = with lib; {
+  meta = {
     homepage = "https://rocksdb.org";
-    description = "A library that provides an embeddable, persistent key-value store for fast storage";
-    changelog = "https://github.com/facebook/rocksdb/raw/v${version}/HISTORY.md";
-    license = licenses.asl20;
-    platforms = platforms.all;
-    maintainers = with maintainers; [
-      adev
-      djds
-      magenbluten
-    ];
+    description = "Library that provides an embeddable, persistent key-value store for fast storage";
+    changelog = "https://github.com/ceph/rocksdb/raw/${finalAttrs.src.rev}/HISTORY.md";
+    license = lib.licenses.asl20;
+    platforms = lib.platforms.all;
+    inherit (ceph.meta) maintainers;
   };
 })

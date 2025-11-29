@@ -3,6 +3,7 @@
   stdenv,
   callPackage,
   fetchurl,
+  fetchpatch,
   fetchpatch2,
 
   # Build time
@@ -302,10 +303,10 @@ stdenv.mkDerivation (finalAttrs: {
   patches = [
     ./patches/boost-1.85.patch
 
-    (fetchpatch2 {
+    (fetchpatch {
       name = "ceph-boost-1.86-uuid.patch";
-      url = "https://github.com/ceph/ceph/commit/01306208eac492ee0e67bff143fc32d0551a2a6f.patch?full_index=1";
-      hash = "sha256-OnDrr72inzGXXYxPFQevsRZImSvI0uuqFHqtFU2dPQE=";
+      url = "https://github.com/ceph/ceph/commit/01306208eac492ee0e67bff143fc32d0551a2a6f.patch";
+      hash = "sha256-bVqA0yCI0btgrM6jSy0LK1l/O6M8lXsPbwht6V9a7pY=";
     })
 
     # See:
@@ -344,6 +345,13 @@ stdenv.mkDerivation (finalAttrs: {
       hash = "sha256-RBNBZW8esbauDXM92y/pZOjDJCcvUkAeE+G8OJj84G0=";
       stripLen = 1;
       extraPrefix = "src/s3select/";
+    })
+
+    # https://tracker.ceph.com/issues/68032
+    (fetchpatch2 {
+      name = "ceph-importlib-metadata-compat.patch";
+      url = "https://github.com/ceph/ceph/commit/8c78a22d2cf69892570f635735d9735169b64a75.patch";
+      hash = "sha256-R8q7Tb2hNxISKX/QUhQHw30XDwM1DjKrdZPo+HwkHL4=";
     })
   ];
 
@@ -551,8 +559,8 @@ stdenv.mkDerivation (finalAttrs: {
     cp -r $out/${sitePackages}/* $client/${sitePackages}
     cp -r $out/etc/bash_completion.d $client/share/bash-completion/completions
     # wrapPythonPrograms modifies .ceph-wrapped, so lets just update its paths
-    substituteInPlace $client/bin/ceph          --replace $out $client
-    substituteInPlace $client/bin/.ceph-wrapped --replace $out $client
+    substituteInPlace $client/bin/ceph          --replace-fail $out $client
+    substituteInPlace $client/bin/.ceph-wrapped --replace-fail $out $client
   '';
 
   outputs = [
