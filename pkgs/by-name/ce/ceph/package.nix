@@ -261,14 +261,31 @@ let
       hash = "sha256-R8q7Tb2hNxISKX/QUhQHw30XDwM1DjKrdZPo+HwkHL4=";
     })
 
+    (fetchpatch2 {
+      name = "remove-distutils-strtobool.patch";
+      url = "https://github.com/ceph/ceph/commit/ffcc157a694f0e40829b5ecd2692e54f0a763607.patch";
+      hash = "sha256-CT7a71GlKp18eDrVnMikG8Sko3CpeEihIuC4fts3HIA=";
+    })
+
     # Using the AUR backport of https://github.com/ceph/ceph/pull/62951
     # See: https://github.com/bazaah/aur-ceph
-    (fetchpatch2 {
+    (fetchpatch2 rec {
       name = "ceph-20.2.0-backport-pybind-avoid-pyo3-errors-by-child-process.patch";
-      url = "https://raw.githubusercontent.com/bazaah/aur-ceph/refs/tags/v19.2.3-3/ceph-20.2.0-backport-pybind-avoid-pyo3-errors-by-child-process.patch";
+      url = "https://raw.githubusercontent.com/bazaah/aur-ceph/refs/tags/v19.2.3-3/${name}";
       hash = "sha256-/m+hfbYTNCEf7WAvjGHga5tN6zdTJxtjTgrTtUWtloo=";
     })
   ];
+
+  postPatch = ''
+    # Need to mark cryptotools as a package for the install.
+    if [ -d src/python-common/ceph/cryptotools ]; then
+      echo "Fixing up cryptotools package" >&2
+      touch src/python-common/ceph/cryptotools/__init__.py
+    else
+      echo "cryptotools package not found!" >&2
+      exit 1
+    fi
+  '';
 
   ceph-common =
     let
@@ -286,14 +303,12 @@ let
         src
         version
         patches
+        postPatch
         ;
 
-      postPatch = ''
-        # Can't just use sourceRoot because these patches are shared with the main derivation.
+      # Can't just use sourceRoot because the patches are shared with the main derivation.
+      preConfigure = ''
         cd src/python-common
-
-        # Need to mark cryptotools as a package for the install.
-        touch ceph/cryptotools/__init__.py
       '';
 
       propagatedBuildInputs = [
@@ -369,6 +384,7 @@ stdenv.mkDerivation (finalAttrs: {
     src
     version
     patches
+    postPatch
     ;
 
   nativeBuildInputs = [
