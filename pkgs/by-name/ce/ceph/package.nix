@@ -207,74 +207,7 @@ let
     hash = "sha256-zlgp28C81SZbaFJ4yvQk4ZgYz4K/aZqtcISTO8LscSU=";
   };
 
-  patches = [
-    ./patches/boost-1.85.patch
-
-    (fetchpatch {
-      name = "ceph-boost-1.86-uuid.patch";
-      url = "https://github.com/ceph/ceph/commit/01306208eac492ee0e67bff143fc32d0551a2a6f.patch";
-      hash = "sha256-bVqA0yCI0btgrM6jSy0LK1l/O6M8lXsPbwht6V9a7pY=";
-    })
-
-    # See:
-    # * <https://github.com/boostorg/python/issues/394>
-    # * <https://aur.archlinux.org/cgit/aur.git/commit/?h=ceph&id=8c5cc7d8deec002f7596b6d0860859a0a718f12b>
-    # * <https://github.com/ceph/ceph/pull/60999>
-    ./patches/boost-1.86-PyModule.patch
-
-    (fetchpatch2 {
-      name = "ceph-cmake-4.patch";
-      url = "https://gitlab.alpinelinux.org/ashpool/aports/-/raw/d22b70eafe33c3daabe4eea6913c5be87d9463ad/community/ceph19/cpp_redis.patch";
-      hash = "sha256-wxPIsYt25CjXhJ6kmr/MXwFD58Sl4y4W+r9jAMND+uw=";
-    })
-
-    # See:
-    # * <https://github.com/ceph/ceph/pull/55560>
-    # * <https://github.com/ceph/ceph/pull/60575>
-    (fetchpatch2 {
-      name = "ceph-systemd-sans-cluster-name.patch";
-      url = "https://github.com/ceph/ceph/commit/5659920c7c128cb8d9552580dbe23dd167a56c31.patch?full_index=1";
-      hash = "sha256-Uch8ZghyTowUvSq0p/RxiVpdG1Yqlww9inpVksO6zyk=";
-    })
-    (fetchpatch2 {
-      name = "ceph-systemd-prefix.patch";
-      url = "https://github.com/ceph/ceph/commit/9b38df488d7101b02afa834ea518fd52076d582a.patch?full_index=1";
-      hash = "sha256-VcbJhCGTUdNISBd6P96Mm5M3fFVmZ8r7pMl+srQmnIQ=";
-    })
-
-    # Remove once Ceph supports arrow-cpp >= 20, see:
-    # * https://tracker.ceph.com/issues/71269
-    # * https://github.com/NixOS/nixpkgs/issues/406306
-    # Patch from: https://github.com/ceph/s3select/pull/169
-    (fetchpatch2 {
-      name = "ceph-s3select-arrow-20-compat.patch";
-      url = "https://github.com/ceph/s3select/commit/58fe02f8c93cd7f4102b435ee7233aa555c7c305.patch";
-      hash = "sha256-RBNBZW8esbauDXM92y/pZOjDJCcvUkAeE+G8OJj84G0=";
-      stripLen = 1;
-      extraPrefix = "src/s3select/";
-    })
-
-    # https://tracker.ceph.com/issues/68032
-    (fetchpatch2 {
-      name = "ceph-importlib-metadata-compat.patch";
-      url = "https://github.com/ceph/ceph/commit/8c78a22d2cf69892570f635735d9735169b64a75.patch";
-      hash = "sha256-R8q7Tb2hNxISKX/QUhQHw30XDwM1DjKrdZPo+HwkHL4=";
-    })
-
-    (fetchpatch2 {
-      name = "remove-distutils-strtobool.patch";
-      url = "https://github.com/ceph/ceph/commit/ffcc157a694f0e40829b5ecd2692e54f0a763607.patch";
-      hash = "sha256-CT7a71GlKp18eDrVnMikG8Sko3CpeEihIuC4fts3HIA=";
-    })
-
-    # Using the AUR backport of https://github.com/ceph/ceph/pull/62951
-    # See: https://github.com/bazaah/aur-ceph
-    (fetchpatch2 rec {
-      name = "ceph-20.2.0-backport-pybind-avoid-pyo3-errors-by-child-process.patch";
-      url = "https://raw.githubusercontent.com/bazaah/aur-ceph/refs/tags/v19.2.3-3/${name}";
-      hash = "sha256-/m+hfbYTNCEf7WAvjGHga5tN6zdTJxtjTgrTtUWtloo=";
-    })
-  ];
+  patches = callPackage ./patches { };
 
   postPatch = ''
     # Need to mark cryptotools as a package for the install.
@@ -373,6 +306,9 @@ let
       # src/tools/cephfs/shell/setup.py
       cmd2
       colorama
+
+      # ceph-mgr uses this
+      xmltodict
     ]
   );
   inherit (ceph-python-env.python) sitePackages;
