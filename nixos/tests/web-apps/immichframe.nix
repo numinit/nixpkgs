@@ -5,17 +5,31 @@ in
 {
   name = "immichframe";
 
+  enableOCR = true;
+
   nodes.machine =
-    { config, pkgs, ... }:
     {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    {
+      imports = [ ../common/x11.nix ];
+
       # When setting this to 2500 I got "Kernel panic - not syncing: Out of
       # memory: compulsory panic_on_oom is enabled".
       virtualisation.memorySize = 3000;
 
-      environment.systemPackages = [
-        pkgs.imagemagick
-        pkgs.immich-cli
+      environment.systemPackages = with pkgs; [
+        imagemagick
+        immich-cli
+        firefox
+        xdotool
       ];
+
+      fonts.packages = [ pkgs.liberation_ttf ];
+
       services.immich = {
         enable = true;
         port = 2283;
@@ -51,6 +65,7 @@ in
   testScript = /* python */ ''
     import json
     import tempfile
+    from shlex import quote
 
     custom_interval = ${toString customInterval}
 
@@ -93,11 +108,18 @@ in
     assets = json.loads(res)
     assert len(assets) == 0, assets
 
-    # Upload some blank images to a new album.
-    machine.succeed("magick -size 800x600 canvas:white /tmp/white.png")
-    machine.succeed("immich upload -A '✨ Reproducible Moments ✨' /tmp/white.png")
-    machine.succeed("magick -size 800x600 canvas:black /tmp/black.png")
-    machine.succeed("immich upload -A '✨ Reproducible Moments ✨' /tmp/black.png")
+    # Repeat 4 times to make it easier for OCR to pick up given overlays
+    image_text = '\\n\\n'.join(['reproduce this moment\\nwith NixOS tests <3'] * 4)
+
+    # These settings make it display fine given potential cropping.
+    common_args = f"-gravity center -font Liberation-Mono -pointsize 50 -annotate 0 {quote(image_text)}"
+
+    # Upload some images to a new album.
+    album_title = '✨ Reproducible Moments ✨'
+    machine.succeed(f"magick -size 800x600 canvas:white -fill black {common_args} /tmp/white.png")
+    machine.succeed(f"immich upload -A {quote(album_title)} /tmp/white.png")
+    machine.succeed(f"magick -size 800x600 canvas:black -fill white {common_args} /tmp/black.png")
+    machine.succeed(f"immich upload -A {quote(album_title)} /tmp/black.png")
     res = machine.succeed("immich server-info")
     print(res)
 
@@ -109,5 +131,15 @@ in
     res = machine.succeed("curl --no-progress-meter -f http://localhost:8002/api/Asset")
     assets = json.loads(res)
     assert len(assets) == 2, assets
+
+    # Wait for a photo to be displayed.
+    machine.wait_for_x()
+    machine.execute("xterm -e 'firefox http://localhost:8002' >&2 &")
+    machine.wait_for_window("immichFrame")
+    _, active_window = machine.execute("xdotool getactivewindow")
+    machine.execute(f"xdotool windowsize {quote(active_window.strip())} 100% 100%")
+    machine.wait_for_text('reproduce this moment')
+    machine.wait_for_text('with NixOS tests')
+    machine.screenshot("screen")
   '';
 }
