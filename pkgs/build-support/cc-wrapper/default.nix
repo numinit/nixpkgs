@@ -288,6 +288,33 @@ let
     else if targetPlatform.isMips then
       # for mips -mtune= takes the same values as -march
       isGccArchSupported tune
+    else if targetPlatform.isRiscV then
+      (
+        if isGNU then
+          {
+            rocket = true;
+            sifive-3-series = true;
+            sifive-5-series = true;
+            sifive-7-series = true;
+            size = true;
+            thead-c906 = versionAtLeast ccVersion "12.0";
+            generic-ooo = versionAtLeast ccVersion "14.0";
+            xiangshan-nanhu = versionAtLeast ccVersion "14.0";
+          }
+          .${tune} or false
+        else if isClang then
+          {
+            generic = true;
+            generic-ooo = true;
+            rocket = true;
+            sifive-7-series = true;
+            veyron-v1 = true;
+            xiangshan-nanhu = true;
+          }
+          .${tune} or false
+        else
+          false
+      )
     else
       false;
 
